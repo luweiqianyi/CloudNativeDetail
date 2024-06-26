@@ -32,7 +32,25 @@ export default defineConfig({
       {
         text: 'Kubernetes',
         items: [
-          { text: 'Kubernetes安装教程', link: '/Kubernetes/001-Kubernetes安装教程' },
+          {
+            text: '实践',
+            collapsed: false,// 设置本条项支持折叠
+            items: [
+              { text: 'Kubernetes安装教程', link: '/Kubernetes/001-Kubernetes安装教程' },
+            ]
+          },
+          {
+            text: 'kubelet',
+            collapsed: false,
+            items: [
+              { text: 'kubelet信息查看', link: '/Kubernetes/kubelet/002-kubelet信息查看' },
+              { text: 'kubelet子模块-云资源同步', link: '/Kubernetes/kubelet/003-kubelet子模块-云资源同步'},
+              { text: 'kubelet子模块-metrics', link: '/Kubernetes/kubelet/004-kubelet子模块-metrics' },
+              { text: 'kubelet子模块-ImageGCManager', link: '/Kubernetes/kubelet/005-kubelet子模块-ImageGCManager'},
+              { text: 'kubelet子模块-serverCertificateManager', link: '/Kubernetes/kubelet/006-kubelet子模块-serverCertificateManager'},
+              { text: 'kubelet子模块-oomWatcher', link: '/Kubernetes/kubelet/007-kubelet子模块-oomWatcher'},
+            ]
+          },
         ]
       }
     ],
