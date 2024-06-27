@@ -49,6 +49,8 @@ export default defineConfig({
               { text: 'kubelet子模块-ImageGCManager', link: '/Kubernetes/kubelet/005-kubelet子模块-ImageGCManager'},
               { text: 'kubelet子模块-serverCertificateManager', link: '/Kubernetes/kubelet/006-kubelet子模块-serverCertificateManager'},
               { text: 'kubelet子模块-oomWatcher', link: '/Kubernetes/kubelet/007-kubelet子模块-oomWatcher'},
+              { text: 'kubelet子模块-resourceAnalyzer', link: '/Kubernetes/kubelet/008-kubelet子模块-resourceAnalyzer'},
+              { text: 'kubelet子模块-volumeManager', link: '/Kubernetes/kubelet/009-kubelet子模块-volumeManager'},
             ]
           },
         ]
