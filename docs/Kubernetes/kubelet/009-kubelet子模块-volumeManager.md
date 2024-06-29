@@ -385,8 +385,122 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 :::
 
 ::: details 协程三：`reconciler`的`Run`方法
+创建`reconciler`
 ```go
+vm.reconciler = reconciler.NewReconciler(
+	kubeClient,
+	controllerAttachDetachEnabled,
+	reconcilerLoopSleepPeriod,
+	waitForAttachTimeout,
+	nodeName,
+	vm.desiredStateOfWorld,
+	vm.actualStateOfWorld,
+	vm.desiredStateOfWorldPopulator.HasAddedPods,
+	vm.operationExecutor,
+	mounter,
+	hostutil,
+	volumePluginMgr,
+	kubeletPodsDir)
 
+// NewReconciler函数的实现体
+func NewReconciler(
+	kubeClient clientset.Interface,
+	controllerAttachDetachEnabled bool,
+	loopSleepDuration time.Duration,
+	waitForAttachTimeout time.Duration,
+	nodeName types.NodeName,
+	desiredStateOfWorld cache.DesiredStateOfWorld,
+	actualStateOfWorld cache.ActualStateOfWorld,
+	populatorHasAddedPods func() bool,
+	operationExecutor operationexecutor.OperationExecutor,
+	mounter mount.Interface,
+	hostutil hostutil.HostUtils,
+	volumePluginMgr *volumepkg.VolumePluginMgr,
+	kubeletPodsDir string) Reconciler {
+	return &reconciler{
+		kubeClient:                      kubeClient,
+		controllerAttachDetachEnabled:   controllerAttachDetachEnabled,
+		loopSleepDuration:               loopSleepDuration,
+		waitForAttachTimeout:            waitForAttachTimeout,
+		nodeName:                        nodeName,
+		desiredStateOfWorld:             desiredStateOfWorld,
+		actualStateOfWorld:              actualStateOfWorld,
+		populatorHasAddedPods:           populatorHasAddedPods,
+		operationExecutor:               operationExecutor,
+		mounter:                         mounter,
+		hostutil:                        hostutil,
+		skippedDuringReconstruction:     map[v1.UniqueVolumeName]*globalVolumeInfo{},
+		volumePluginMgr:                 volumePluginMgr,
+		kubeletPodsDir:                  kubeletPodsDir,
+		timeOfLastSync:                  time.Time{},
+		volumesFailedReconstruction:     make([]podVolume, 0),
+		volumesNeedUpdateFromNodeStatus: make([]v1.UniqueVolumeName, 0),
+		volumesNeedReportedInUse:        make([]v1.UniqueVolumeName, 0),
+	}
+}
+```
+`reconciler`的`Run`方法：可以看到`NewVolumeManagerReconstruction`属性被激活时就使用新的运行方法(`runNew`)；未被激活时则使用旧的运行方法(`runOld`)
+```go
+func (rc *reconciler) Run(stopCh <-chan struct{}) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.NewVolumeManagerReconstruction) {
+		rc.runNew(stopCh)
+		return
+	}
+
+	rc.runOld(stopCh)
+}
+```
+
+`runOld`的具体实现
+```go
+func (rc *reconciler) runOld(stopCh <-chan struct{}) {
+	wait.Until(rc.reconciliationLoopFunc(), rc.loopSleepDuration, stopCh)
+}
+
+// 结合上面的代码，可以看到runOld的本质就是周期性执行reconciliationLoopFunc函数，直到stopCh收到关闭信号
+func (rc *reconciler) reconciliationLoopFunc() func() {
+	return func() {
+		rc.reconcile()
+
+		// Sync the state with the reality once after all existing pods are added to the desired state from all sources.
+		// Otherwise, the reconstruct process may clean up pods' volumes that are still in use because
+		// desired state of world does not contain a complete list of pods.
+		if rc.populatorHasAddedPods() && !rc.StatesHasBeenSynced() {
+			klog.InfoS("Reconciler: start to sync state")
+			rc.sync()
+		}
+	}
+}
+
+// reconcile函数的实现如下
+func (rc *reconciler) reconcile() {
+	// Unmounts are triggered before mounts so that a volume that was
+	// referenced by a pod that was deleted and is now referenced by another
+	// pod is unmounted from the first pod before being mounted to the new
+	// pod.
+	rc.unmountVolumes()
+
+	// Next we mount required volumes. This function could also trigger
+	// attach if kubelet is responsible for attaching volumes.
+	// If underlying PVC was resized while in-use then this function also handles volume
+	// resizing.
+	rc.mountOrAttachVolumes()
+
+	// Ensure devices that should be detached/unmounted are detached/unmounted.
+	rc.unmountDetachDevices()
+
+	// After running the above operations if skippedDuringReconstruction is not empty
+	// then ensure that all volumes which were discovered and skipped during reconstruction
+	// are added to actualStateOfWorld in uncertain state.
+	if len(rc.skippedDuringReconstruction) > 0 {
+		rc.processReconstructedVolumes()
+	}
+}
+// 可以看到，reconcile函数本质上就是执行了四个行为，每个行为的具体内容这里就不再展开，具体代码逻辑可以详看“pkg\kubelet\volumemanager\reconciler\reconciler_common.go”中的实现。
+// unmountVolumes函数是卸载卷，当卷需要挂载到另外一个pod时，需要从原pod中卸载，即unmount
+// mountOrAttachVolumes函数是挂载卷。将卷挂载到新的pod上。
+// unmountDetachDevices函数确保那些应该被detached/unmounted的卷真的被detached/unmounted了。
+// processReconstructedVolumes函数的执行是有先决条件的，符合条件时，它才能执行。它的功能是：确保在重建过程中发现并跳过的所有卷都以不确定状态添加到 actualStateOfWorld 中。
 ```
 :::
 
