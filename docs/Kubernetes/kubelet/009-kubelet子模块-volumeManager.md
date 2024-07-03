@@ -380,7 +380,255 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 
 ::: details 协程二：`desiredStateOfWorldPopulator`的`Run`方法
 ```go
+// 创建
+vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
+		kubeClient,
+		desiredStateOfWorldPopulatorLoopSleepPeriod,
+		podManager,
+		podStateProvider,
+		vm.desiredStateOfWorld,
+		vm.actualStateOfWorld,
+		kubeContainerRuntime,
+		keepTerminatedPodVolumes,
+		csiMigratedPluginManager,
+		intreeToCSITranslator,
+		volumePluginMgr)
 
+func NewDesiredStateOfWorldPopulator(
+	kubeClient clientset.Interface,
+	loopSleepDuration time.Duration,
+	podManager PodManager,
+	podStateProvider PodStateProvider,
+	desiredStateOfWorld cache.DesiredStateOfWorld,
+	actualStateOfWorld cache.ActualStateOfWorld,
+	kubeContainerRuntime kubecontainer.Runtime,
+	keepTerminatedPodVolumes bool,
+	csiMigratedPluginManager csimigration.PluginManager,
+	intreeToCSITranslator csimigration.InTreeToCSITranslator,
+	volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorldPopulator {
+	return &desiredStateOfWorldPopulator{
+		kubeClient:          kubeClient,
+		loopSleepDuration:   loopSleepDuration,
+		podManager:          podManager,
+		podStateProvider:    podStateProvider,
+		desiredStateOfWorld: desiredStateOfWorld,
+		actualStateOfWorld:  actualStateOfWorld,
+		pods: processedPods{
+			processedPods: make(map[volumetypes.UniquePodName]bool)},
+		kubeContainerRuntime:     kubeContainerRuntime,
+		keepTerminatedPodVolumes: keepTerminatedPodVolumes,
+		hasAddedPods:             false,
+		hasAddedPodsLock:         sync.RWMutex{},
+		csiMigratedPluginManager: csiMigratedPluginManager,
+		intreeToCSITranslator:    intreeToCSITranslator,
+		volumePluginMgr:          volumePluginMgr,
+	}
+}
+```
+```go
+// 运行
+func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+	// Wait for the completion of a loop that started after sources are all ready, then set hasAddedPods accordingly
+	klog.InfoS("Desired state populator starts to run")
+	wait.PollUntil(dswp.loopSleepDuration, func() (bool, error) {
+		done := sourcesReady.AllReady()
+		dswp.populatorLoop()
+		return done, nil
+	}, stopCh)
+	dswp.hasAddedPodsLock.Lock()
+	if !dswp.hasAddedPods {
+		klog.InfoS("Finished populating initial desired state of world")
+		dswp.hasAddedPods = true
+	}
+	dswp.hasAddedPodsLock.Unlock()
+	wait.Until(dswp.populatorLoop, dswp.loopSleepDuration, stopCh)
+}
+
+// populatorLoop的具体实现
+func (dswp *desiredStateOfWorldPopulator) populatorLoop() {
+	dswp.findAndAddNewPods()
+	dswp.findAndRemoveDeletedPods()
+}
+
+// findAndAddNewPods的具体实现（获取节点上的卷，然后获取Pods，对Pods中每一个Pod调用processPodVolumes进行处理）
+func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
+	// Map unique pod name to outer volume name to MountedVolume.
+	mountedVolumesForPod := make(map[volumetypes.UniquePodName]map[string]cache.MountedVolume)
+	for _, mountedVolume := range dswp.actualStateOfWorld.GetMountedVolumes() {
+		mountedVolumes, exist := mountedVolumesForPod[mountedVolume.PodName]
+		if !exist {
+			mountedVolumes = make(map[string]cache.MountedVolume)
+			mountedVolumesForPod[mountedVolume.PodName] = mountedVolumes
+		}
+		mountedVolumes[mountedVolume.OuterVolumeSpecName] = mountedVolume
+	}
+
+	for _, pod := range dswp.podManager.GetPods() {
+		// Keep consistency of adding pod during reconstruction
+		if dswp.hasAddedPods && dswp.podStateProvider.ShouldPodContainersBeTerminating(pod.UID) {
+			// Do not (re)add volumes for pods that can't also be starting containers
+			continue
+		}
+
+		if !dswp.hasAddedPods && dswp.podStateProvider.ShouldPodRuntimeBeRemoved(pod.UID) {
+			// When kubelet restarts, we need to add pods to dsw if there is a possibility
+			// that the container may still be running
+			continue
+		}
+
+		dswp.processPodVolumes(pod, mountedVolumesForPod)
+	}
+}
+
+// processPodVolumes的具体实现
+func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
+	pod *v1.Pod,
+	mountedVolumesForPod map[volumetypes.UniquePodName]map[string]cache.MountedVolume) {
+	if pod == nil {
+		return
+	}
+
+	uniquePodName := util.GetUniquePodName(pod)
+	if dswp.podPreviouslyProcessed(uniquePodName) {
+		return
+	}
+
+	allVolumesAdded := true
+	// 获取pod使用的卷和devices
+	mounts, devices, seLinuxContainerContexts := util.GetPodVolumeNames(pod)
+
+	// Process volume spec for each volume defined in pod
+	for _, podVolume := range pod.Spec.Volumes {
+		if !mounts.Has(podVolume.Name) && !devices.Has(podVolume.Name) {
+			// Volume is not used in the pod, ignore it.
+			klog.V(4).InfoS("Skipping unused volume", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
+			continue
+		}
+
+		pvc, volumeSpec, volumeGidValue, err :=
+			dswp.createVolumeSpec(podVolume, pod, mounts, devices)
+		if err != nil {
+			klog.ErrorS(err, "Error processing volume", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
+			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
+			allVolumesAdded = false
+			continue
+		}
+
+		// Add volume to desired state of world
+		uniqueVolumeName, err := dswp.desiredStateOfWorld.AddPodToVolume(
+			uniquePodName, pod, volumeSpec, podVolume.Name, volumeGidValue, seLinuxContainerContexts[podVolume.Name])
+		if err != nil {
+			klog.ErrorS(err, "Failed to add volume to desiredStateOfWorld", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
+			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
+			allVolumesAdded = false
+		} else {
+			klog.V(4).InfoS("Added volume to desired state", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
+		}
+		if !utilfeature.DefaultFeatureGate.Enabled(features.NewVolumeManagerReconstruction) {
+			// sync reconstructed volume. This is necessary only when the old-style reconstruction is still used.
+			// With reconstruct_new.go, AWS.MarkVolumeAsMounted will update the outer spec name of previously
+			// uncertain volumes.
+			dswp.actualStateOfWorld.SyncReconstructedVolume(uniqueVolumeName, uniquePodName, podVolume.Name)
+		}
+
+		dswp.checkVolumeFSResize(pod, podVolume, pvc, volumeSpec, uniquePodName, mountedVolumesForPod)
+	}
+
+	// some of the volume additions may have failed, should not mark this pod as fully processed
+	if allVolumesAdded {
+		dswp.markPodProcessed(uniquePodName)
+		// New pod has been synced. Re-mount all volumes that need it
+		// (e.g. DownwardAPI)
+		dswp.actualStateOfWorld.MarkRemountRequired(uniquePodName)
+		// Remove any stored errors for the pod, everything went well in this processPodVolumes
+		dswp.desiredStateOfWorld.PopPodErrors(uniquePodName)
+	} else if dswp.podHasBeenSeenOnce(uniquePodName) {
+		// For the Pod which has been processed at least once, even though some volumes
+		// may not have been reprocessed successfully this round, we still mark it as processed to avoid
+		// processing it at a very high frequency. The pod will be reprocessed when volume manager calls
+		// ReprocessPod() which is triggered by SyncPod.
+		dswp.markPodProcessed(uniquePodName)
+	}
+
+}
+
+// findAndRemoveDeletedPods的具体实现
+func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
+	podsFromCache := make(map[volumetypes.UniquePodName]struct{})
+	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
+		podsFromCache[volumetypes.UniquePodName(volumeToMount.Pod.UID)] = struct{}{}
+		pod, podExists := dswp.podManager.GetPodByUID(volumeToMount.Pod.UID)
+		if podExists {
+
+			// check if the attachability has changed for this volume
+			if volumeToMount.PluginIsAttachable {
+				attachableVolumePlugin, err := dswp.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
+				// only this means the plugin is truly non-attachable
+				if err == nil && attachableVolumePlugin == nil {
+					// It is not possible right now for a CSI plugin to be both attachable and non-deviceMountable
+					// So the uniqueVolumeName should remain the same after the attachability change
+					dswp.desiredStateOfWorld.MarkVolumeAttachability(volumeToMount.VolumeName, false)
+					klog.InfoS("Volume changes from attachable to non-attachable", "volumeName", volumeToMount.VolumeName)
+					continue
+				}
+			}
+
+			// Exclude known pods that we expect to be running
+			if !dswp.podStateProvider.ShouldPodRuntimeBeRemoved(pod.UID) {
+				continue
+			}
+			if dswp.keepTerminatedPodVolumes {
+				continue
+			}
+		}
+
+		// Once a pod has been deleted from kubelet pod manager, do not delete
+		// it immediately from volume manager. Instead, check the kubelet
+		// pod state provider to verify that all containers in the pod have been
+		// terminated.
+		if !dswp.podStateProvider.ShouldPodRuntimeBeRemoved(volumeToMount.Pod.UID) {
+			klog.V(4).InfoS("Pod still has one or more containers in the non-exited state and will not be removed from desired state", "pod", klog.KObj(volumeToMount.Pod))
+			continue
+		}
+		var volumeToMountSpecName string
+		if volumeToMount.VolumeSpec != nil {
+			volumeToMountSpecName = volumeToMount.VolumeSpec.Name()
+		}
+		removed := dswp.actualStateOfWorld.PodRemovedFromVolume(volumeToMount.PodName, volumeToMount.VolumeName)
+		if removed && podExists {
+			klog.V(4).InfoS("Actual state does not yet have volume mount information and pod still exists in pod manager, skip removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
+			continue
+		}
+		klog.V(4).InfoS("Removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
+		dswp.desiredStateOfWorld.DeletePodFromVolume(
+			volumeToMount.PodName, volumeToMount.VolumeName)
+		dswp.deleteProcessedPod(volumeToMount.PodName)
+	}
+
+	// Cleanup orphanded entries from processedPods
+	dswp.pods.Lock()
+	orphanedPods := make([]volumetypes.UniquePodName, 0, len(dswp.pods.processedPods))
+	for k := range dswp.pods.processedPods {
+		if _, ok := podsFromCache[k]; !ok {
+			orphanedPods = append(orphanedPods, k)
+		}
+	}
+	dswp.pods.Unlock()
+	for _, orphanedPod := range orphanedPods {
+		uid := types.UID(orphanedPod)
+		_, podExists := dswp.podManager.GetPodByUID(uid)
+		if !podExists && dswp.podStateProvider.ShouldPodRuntimeBeRemoved(uid) {
+			dswp.deleteProcessedPod(orphanedPod)
+		}
+	}
+
+	podsWithError := dswp.desiredStateOfWorld.GetPodsWithErrors()
+	for _, podName := range podsWithError {
+		if _, podExists := dswp.podManager.GetPodByUID(types.UID(podName)); !podExists {
+			dswp.desiredStateOfWorld.PopPodErrors(podName)
+		}
+	}
+}
 ```
 :::
 
