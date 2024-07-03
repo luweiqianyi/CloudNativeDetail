@@ -63,6 +63,12 @@ export default defineConfig({
             ]
           },
         ]
+      },
+      {
+        text: 'Linux',
+        items: [
+          { text: 'cat命令格式化显示Json数据', link: '/Linux/cat命令格式化显示Json数据' },
+        ]
       }
     ],
 
