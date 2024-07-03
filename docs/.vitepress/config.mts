@@ -27,7 +27,13 @@ export default defineConfig({
       {
         text: 'Docker',
         items: [
-          { text: 'Docker安装教程', link: '/Docker/001-Docker安装教程' },
+          {
+            text: '实践',
+            collapsed: false,
+            items: [
+              { text: 'Docker安装教程', link: '/Docker/practice/Docker安装教程' },
+            ]
+          },
         ]
       },
       {

@@ -12,7 +12,7 @@ hero:
   actions:
     - theme: brand
       text: Docker
-      link: /Docker/001-Docker安装教程
+      link: /Docker/practice/Docker安装教程
     - theme: alt
       text: Kubernetes
       link: /Kubernetes/001-Kubernetes安装教程
