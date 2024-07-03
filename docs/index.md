@@ -15,7 +15,7 @@ hero:
       link: /Docker/practice/Docker安装教程
     - theme: alt
       text: Kubernetes
-      link: /Kubernetes/001-Kubernetes安装教程
+      link: /Kubernetes/practice/001-Kubernetes安装教程
 
 # features:
 #   - title: Feature A

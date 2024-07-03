@@ -12,8 +12,8 @@ export default defineConfig({
     // 导航栏设置
     // https://vitepress.dev/reference/default-theme-config
     nav: [
-      { text: 'Docker', link: '/Docker/001-Docker安装教程' },
-      { text: 'Kubernetes', link: '/Kubernetes/001-Kubernetes安装教程' },
+      { text: 'Docker', link: '/Docker/practice/Docker安装教程' },
+      { text: 'Kubernetes', link: '/Kubernetes/practice/001-Kubernetes安装教程' },
       { text: '关于我', link: '/about/me' },
     ],
 
@@ -44,7 +44,7 @@ export default defineConfig({
             text: '实践',
             collapsed: false,// 设置本条项支持折叠
             items: [
-              { text: 'Kubernetes安装教程', link: '/Kubernetes/001-Kubernetes安装教程' },
+              { text: 'Kubernetes安装教程', link: '/Kubernetes/practice/001-Kubernetes安装教程' },
             ]
           },
           {
