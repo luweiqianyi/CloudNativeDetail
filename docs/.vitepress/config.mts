@@ -67,6 +67,7 @@ export default defineConfig({
       {
         text: 'Linux',
         items: [
+          { text: 'Linux命令大全', link: '/Linux/Linux命令大全' },
           { text: 'cat命令格式化显示Json数据', link: '/Linux/cat命令格式化显示Json数据' },
         ]
       }
