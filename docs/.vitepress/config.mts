@@ -45,6 +45,7 @@ export default defineConfig({
             collapsed: false,// 设置本条项支持折叠
             items: [
               { text: 'Kubernetes安装教程', link: '/Kubernetes/practice/001-Kubernetes安装教程' },
+              { text: 'kubernetes部署minio', link: '/Kubernetes/practice/kubernetes部署minio' },
             ]
           },
           {
