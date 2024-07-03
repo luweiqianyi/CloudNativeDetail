@@ -32,6 +32,7 @@ export default defineConfig({
             collapsed: false,
             items: [
               { text: 'Docker安装教程', link: '/Docker/practice/Docker安装教程' },
+              { text: 'harbor-本地镜像仓库搭建', link: '/Docker/practice/harbor-本地镜像仓库搭建' },
             ]
           },
         ]
