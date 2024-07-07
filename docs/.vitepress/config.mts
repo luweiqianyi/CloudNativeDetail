@@ -81,6 +81,12 @@ export default defineConfig({
           { text: '创建软链接', link: '/Linux/创建软链接' },
           { text: 'cat命令格式化显示Json数据', link: '/Linux/cat命令格式化显示Json数据' },
         ]
+      },
+      {
+        text: 'nginx',
+        items: [
+          { text: '服务器部署nginx', link: '/nginx/服务器部署nginx' },
+        ]
       }
     ],
 
