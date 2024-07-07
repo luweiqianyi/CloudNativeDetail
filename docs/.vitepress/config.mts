@@ -25,6 +25,12 @@ export default defineConfig({
     // 左侧边栏
     sidebar: [
       {
+        text: 'containerd',
+        items: [
+          { text: 'containerd配置使用自建的镜像仓库', link: '/containerd/containerd配置使用自建的镜像仓库' },
+        ]
+      },
+      {
         text: 'Docker',
         items: [
           {
@@ -46,6 +52,10 @@ export default defineConfig({
             items: [
               { text: 'Kubernetes安装教程', link: '/Kubernetes/practice/001-Kubernetes安装教程' },
               { text: 'kubernetes部署minio', link: '/Kubernetes/practice/kubernetes部署minio' },
+              { text: 'kubernetes部署Pod', link: '/Kubernetes/practice/kubernetes部署Pod' },
+              { text: 'kubernetes部署service暴露端口', link: '/Kubernetes/practice/kubernetes部署service暴露端口' },
+              { text: 'kubernetes为一个Pod部署多个副本', link: '/Kubernetes/practice/kubernetes为一个Pod部署多个副本' },
+              { text: '部署同目录下多个yaml的shell脚本', link: '/Kubernetes/practice/部署同目录下多个yaml的shell脚本' },
             ]
           },
           {
