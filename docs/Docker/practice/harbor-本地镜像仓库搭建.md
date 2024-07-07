@@ -94,7 +94,7 @@ hostname: harbor.nicklaus.com
   certificate: /etc/cert/harbor/harbor.nicklaus.com.crt
   private_key: /etc/cert/harbor/harbor.nicklaus.com.key
 #harbor密码
-harbor_admin_password: devops
+harbor_admin_password: Harbor12345
 # Harbor数据库密码
 database:
   # The password for the root user of Harbor DB. Change this before any production use.
@@ -102,6 +102,7 @@ database:
 #数据存储位置
 data_volume: /data/harbor
 ```
+> 默认的登录密码是`Harbor12345`，改成你自己的密码即可。
 ## 6. 安装并启动Harbor
 `install.sh`脚本是安装`Harbor`的脚本，所以直接执行即可!
 ```shell
