@@ -3,9 +3,9 @@
 layout: home
 
 hero:
-  name: "云原生"
-  text: "云原生相关技术栈。"
-  tagline: "介绍微服务、容器编排工具和自动扩缩等相关技术栈。"
+  name: "Nicklaus技术小站"
+  text: "云原生开发运维技术栈"
+  tagline: "介绍微服务、容器编排、微服务、开发运维等相关技术栈。"
   image:
     src: /vitepress-logo-large.webp
     alt: VitePress

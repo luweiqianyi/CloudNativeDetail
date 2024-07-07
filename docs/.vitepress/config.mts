@@ -2,9 +2,9 @@ import { defineConfig } from 'vitepress'
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-  base: '/CloudNativeDetail/',
-  title: "云原生",
-  description: "介绍云原生相关技术栈。",
+  // base: '/CloudNativeDetail/',
+  title: "Nicklaus技术小站",
+  description: "介绍云原生开发运维相关技术栈。",
   lastUpdated: true, // 显示文章的最近一次更新时间
   themeConfig: {
     logo: '/logo.svg', // 站点标题图标设置
