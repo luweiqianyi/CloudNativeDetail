@@ -592,8 +592,11 @@ sudo systemctl start nginx
     :::
 * 将`nicklaus-tech-website`整个目录拷贝到`/usr/share/nginx/html/`下，这个步骤需要提权(提升为`root`权限)
     ```sh
+    sudo su -
+    rm -rf /usr/share/nginx/html/nicklaus-tech-website
     cp -r /home/ecs-user/programs-to-deploy/nicklaus-tech-website /usr/share/nginx/html/
     ```
+    > 使用`rm`命令是因为`cp`命令在文件存在时会让用户一个个确认是否要覆盖，索性在拷贝之前先把原文件都删除掉。
 ### 在nginx中配置打包的项目
 在前面已经说过，`/etc/nginx`这个目录是存放配置文件的目录，该目录下的`conf.d`目录用来存放我们自己项目的服务配置。所以在这个目录下新建一个`nicklaus-tech-website.conf`，文件内容如下所示：
 ```conf
