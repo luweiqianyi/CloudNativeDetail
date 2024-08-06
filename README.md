@@ -1,2 +1,2 @@
 # 项目说明
-云原生站点，介绍本人在云原生相关的实践，包括但不限于`Docker`、`Kubernetes`等方面相关内容。
+个人技术小站，介绍个人在vue、go、gozero、c++、docker、kubernetes等方面的技术积累。
