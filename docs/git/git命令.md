@@ -42,16 +42,22 @@ git push -u origin master
 * 查看暂存的改动：`git stash list`
 * 删除某次暂存的改动：`git stash drop stash@{n}`
 * 清除所有暂存的改动：`git stash clear`
+* 案例分析：本地文件发生改动，在`git stash`执行之前，直接使用命令`git pull origin master`拉取远程文件到本地时发生错误时使用，错误提示为："error: Your local changes to the following files would be overwritten by merge:"。正确使用案例为：
+    ```shell
+    git stash
+    git pull origin master
+    git stash pop
+    ```
 
 ## 代理配置与取消
 原因是国内网络无法访问`github`，需要将`git`的请求代理到本地代理服务上，然后才能与远程`github`进行数据传输
-    ```sh
-    git config --global https.proxy http://127.0.0.1:7890
-    git config --global https.proxy https://127.0.0.1:7890
-    git config --global --unset http.proxy
-    git config --global --unset https.proxy
-    ```
-    > 配置后，`.gitconfig`文件中会保存如上配置，后面两条命令是取消代理
+```sh
+git config --global https.proxy http://127.0.0.1:7890
+git config --global https.proxy https://127.0.0.1:7890
+git config --global --unset http.proxy
+git config --global --unset https.proxy
+```
+> 配置后，`.gitconfig`文件中会保存如上配置，后面两条命令是取消代理
 
 ## tag
 1. 查看所有`tag`
@@ -83,3 +89,44 @@ git checkout new-branch-name
     ```sh
     git branch -D new-branch-name
     ```
+5. `git checkout`创建新分支并切换
+    ```sh
+    git checkout -b new-branch-name
+    ```
+    > 使用`-b`加待创建的分支的名字来进行创建，并切换到新创建的分支。若待创建的分支已经存在会报错。
+6.  将新创建的分支推送到远程仓库，让远程仓库也有这个分支
+    ```sh
+    git push origin new_branch_name:new_branch_name
+    ```
+    > 这里指定远程分支和本地分支同名
+7. 删除远程分支
+* 推送一个空分支以达到删除的目的
+    ```sh
+    git push origin :new_branch_name
+    ```
+* 使用`--delete`进行删除
+    ```sh
+    git push origin --delete new_branch_name
+    ```
+## 日志
+* 查看提交的日志记录
+```sh
+PS D:\Code\github.com\luweiqianyi\CloudNativeDetail> git log
+commit fa64ca65d72549dad373913ad83dd03ec06e3bf0 (HEAD -> test, origin/main, main)
+Author: luweiqianyi <runningriven@163.com>
+Date:   Wed Aug 7 00:00:09 2024 +0800
+
+    增加git栏目：增加相关文章
+
+commit 55b086b541b3e40d785e55096ba005865d6d3bf7
+Author: nicklaus <runningriven@gmail.com>
+Date:   Tue Aug 6 22:38:57 2024 +0800
+
+    站点主界面介绍修改
+
+commit ec9a97799b833c9192b369057a432b5cb121d38d
+Author: nicklaus <runningriven@gmail.com>
+Date:   Tue Aug 6 22:36:20 2024 +0800
+
+    README修改
+```
