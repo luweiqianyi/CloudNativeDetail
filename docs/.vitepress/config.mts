@@ -83,6 +83,14 @@ export default defineConfig({
         ]
       },
       {
+        text: 'git',
+        items: [
+          { text: 'git命令', link: '/git/git命令' },
+          { text: 'Linux系统安装git', link: '/git/Linux系统安装git' },
+          { text: 'RockyLinux安装gitlab-ce', link: '/git/RockyLinux安装gitlab-ce' },
+        ]
+      },
+      {
         text: 'nginx',
         items: [
           { text: '服务器部署nginx', link: '/nginx/服务器部署nginx' },
