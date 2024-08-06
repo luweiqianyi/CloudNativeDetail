@@ -5,7 +5,7 @@ layout: home
 hero:
   name: "Nicklaus技术小站"
   text: ""
-  tagline: "整理个人在前端开发、后端开发、C++开发、Docker、Kubernetes等方面的一些技术积累。"
+  tagline: "整理个人在vue、go/gozero、gorm、mysql、C++、python、Docker、Kubernetes、nginx、linux、运维等方面的一些技术积累。"
   image:
     src: /vitepress-logo-large.webp
     alt: VitePress
