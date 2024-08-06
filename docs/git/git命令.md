@@ -108,6 +108,11 @@ git checkout new-branch-name
     ```sh
     git push origin --delete new_branch_name
     ```
+8. 合并分支
+    ```sh
+    git merge branch-name
+    ```
+    > 发生的场景为：假如某个分支为代码提交的基准分支，比如说`master`分支，然后这时候需要修改一些代码并通过测试，这时候采取的策略可以是新建一个分支，比如名字叫做`branch-name`，当`branch-name`分支上的代码通过测试之后，需要将修改合并到`master`分支。则可以用`git merge`将分支`branch-name`上的修改合并到`master`分支。注意：`git merge`命令的执行是在合并的目地分支上进行，即上文说到的`master`分支。
 ## 日志
 * 查看提交的日志记录
 ```sh
